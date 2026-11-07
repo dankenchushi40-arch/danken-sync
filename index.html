@@ -1,0 +1,95 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#080d16">
+<title>Danken Sync</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#080d16;color:#fff;font-family:Arial,sans-serif;min-height:100vh;padding:24px}
+main{max-width:480px;margin:35px auto}
+.logo{font-size:28px;font-weight:800;color:#56e5ae}
+.tag{color:#9ba9ba;font-size:14px}
+.card{background:#121c2b;border:1px solid #26364a;border-radius:18px;padding:22px;margin-top:22px}
+h1{font-size:30px;margin-bottom:8px}
+h2{font-size:19px}
+p{color:#aab8c9;line-height:1.5}
+button,input{width:100%;padding:15px;border-radius:11px;font-size:16px;margin-top:12px}
+button{border:0;background:#51e0a9;color:#06140f;font-weight:bold}
+.secondary{background:#26364a;color:white}
+input{background:#080d16;border:1px solid #34445b;color:white;text-align:center;letter-spacing:4px}
+.status{padding:12px;background:#1a2b39;border-radius:10px;color:#56e5ae;font-size:14px;margin-top:15px}
+.hidden{display:none}
+footer{text-align:center;color:#718096;font-size:12px;margin-top:35px}
+</style>
+</head>
+<body>
+<main>
+<div class="logo">♪ DANKEN SYNC</div>
+<p class="tag">One music session. Multiple phones.</p>
+
+<section class="card" id="home">
+<h1>Play together.</h1>
+<p>Connect your phones and control your music from one main device.</p>
+<h2>Create a room</h2>
+<button onclick="createRoom()">Create Room</button>
+<h2>Join a room</h2>
+<input id="roomInput" maxlength="6" placeholder="ENTER ROOM CODE">
+<button class="secondary" onclick="joinRoom()">Join Room</button>
+<div class="status" id="message">Waiting for you to connect a device.</div>
+</section>
+
+<section class="card hidden" id="room">
+<h1 id="roleTitle">Your room</h1>
+<p id="roleText"></p>
+<h2>Room code</h2>
+<input id="roomCode" readonly>
+<button class="secondary" onclick="copyCode()">Copy room code</button>
+<div class="status" id="roomStatus">Room created locally. Server connection not yet enabled.</div>
+<button class="secondary" onclick="goBack()">Leave room</button>
+</section>
+
+<footer>DANKEN SYNC • VERSION 0.1</footer>
+</main>
+<script>
+function showRoom(code,role){
+ document.getElementById("home").classList.add("hidden");
+ document.getElementById("room").classList.remove("hidden");
+ document.getElementById("roomCode").value=code;
+ document.getElementById("roleTitle").textContent=
+ role==="main"?"Main device":"Connected device";
+ document.getElementById("roleText").textContent=
+ role==="main"?"Share this code with your second phone.":
+ "You entered a room code. Server pairing comes next.";
+}
+function createRoom(){
+ const code=Math.random().toString(36).substring(2,8).toUpperCase();
+ showRoom(code,"main");
+}
+function joinRoom(){
+ const code=document.getElementById("roomInput").value.trim().toUpperCase();
+ if(!/^[A-Z0-9]{6}$/.test(code)){
+  document.getElementById("message").textContent=
+  "Please enter a valid six-character room code.";
+  return;
+ }
+ showRoom(code,"secondary");
+}
+function copyCode(){
+ const code=document.getElementById("roomCode").value;
+ if(navigator.clipboard){
+  navigator.clipboard.writeText(code).then(()=>{
+   document.getElementById("roomStatus").textContent="Room code copied!";
+  }).catch(()=>{});
+ }
+}
+function goBack(){
+ document.getElementById("room").classList.add("hidden");
+ document.getElementById("home").classList.remove("hidden");
+}
+</script>
+</body>
+  </html>
+  
