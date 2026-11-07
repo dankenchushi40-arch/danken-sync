@@ -1,0 +1,186 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#080d16">
+<title>Danken Sync</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#080d16;color:#fff;font-family:Arial,sans-serif;padding:22px}
+main{max-width:480px;margin:35px auto}
+.logo{font-size:27px;font-weight:800;color:#56e5ae}
+.muted{color:#9ba9ba;line-height:1.5}
+.card{background:#121c2b;border:1px solid #26364a;border-radius:18px;padding:22px;margin-top:22px}
+h1{font-size:29px}
+h2{font-size:19px}
+button,input{width:100%;padding:15px;border-radius:11px;font-size:16px;margin-top:12px}
+button{border:0;background:#51e0a9;color:#06140f;font-weight:bold}
+button:disabled{opacity:.4}
+.secondary{background:#26364a;color:white}
+input{background:#080d16;border:1px solid #34445b;color:white;text-align:center;letter-spacing:4px}
+.status{padding:13px;background:#1a2b39;border-radius:10px;color:#56e5ae;font-size:14px;margin-top:15px}
+.hidden{display:none}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid button{margin-top:8px}
+footer{text-align:center;color:#718096;font-size:12px;margin-top:35px}
+</style>
+</head>
+<body>
+<main>
+<div class="logo">♪ DANKEN SYNC</div>
+<p class="muted">One music session. Multiple phones.</p>
+
+<section class="card" id="home">
+<h1>Play together.</h1>
+<p class="muted">Connect your phones through a shared music room.</p>
+<h2>Create a room</h2>
+<button onclick="createRoom()">Create Room</button>
+<h2>Join a room</h2>
+<input id="roomInput" maxlength="6" placeholder="ENTER ROOM CODE">
+<button class="secondary" onclick="joinRoom()">Join Room</button>
+<div class="status" id="homeStatus">Ready to connect.</div>
+</section>
+
+<section class="card hidden" id="room">
+<h1 id="roleTitle">Music room</h1>
+<p class="muted" id="roleText"></p>
+<h2>Room code</h2>
+<input id="roomCode" readonly>
+<button class="secondary" onclick="copyCode()">Copy room code</button>
+<div class="status" id="connection">Connecting to server...</div>
+<div class="status" id="devices">Waiting for devices...</div>
+
+<div id="controls" class="hidden">
+<h2>Main device controls</h2>
+<p class="muted">These buttons send playback commands to connected devices. They do not yet control YouTube Music.</p>
+<div class="grid">
+<button onclick="sendCommand('play')">Play</button>
+<button class="secondary" onclick="sendCommand('pause')">Pause</button>
+</div>
+<button class="secondary" onclick="sendCommand('seek')">Send sync signal</button>
+</div>
+
+<div class="status" id="activity">No commands received yet.</div>
+<button class="secondary" onclick="leaveRoom()">Leave room</button>
+</section>
+
+<footer>DANKEN SYNC • VERSION 0.2</footer>
+</main>
+
+<script>
+let socket=null;
+let currentRole=null;
+let currentCode=null;
+
+function randomCode(){
+ const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+ const bytes=new Uint8Array(6);
+ crypto.getRandomValues(bytes);
+ return Array.from(bytes,b=>chars[b%chars.length]).join("");
+}
+
+function openRoom(code,role){
+ currentCode=code;
+ currentRole=role;
+ document.getElementById("home").classList.add("hidden");
+ document.getElementById("room").classList.remove("hidden");
+ document.getElementById("roomCode").value=code;
+ document.getElementById("roleTitle").textContent=
+ role==="main"?"Main device":"Connected device";
+ document.getElementById("roleText").textContent=
+ role==="main"?"Share this code with your second phone.":
+ "You joined the main device's room.";
+ document.getElementById("controls").classList.toggle("hidden",role!=="main");
+ document.getElementById("connection").textContent="Connecting...";
+ const protocol=location.protocol==="https:"?"wss:":"ws:";
+ const address=protocol+"//"+location.host+
+ "/ws?room="+encodeURIComponent(code)+
+ "&role="+encodeURIComponent(role);
+
+ socket=new WebSocket(address);
+
+ socket.onopen=()=>{
+  document.getElementById("connection").textContent="Connected to room server.";
+ };
+
+ socket.onmessage=(event)=>{
+  let data;
+  try{data=JSON.parse(event.data)}catch{return}
+
+  if(data.type==="connected"){
+   document.getElementById("connection").textContent=
+    "Connected as "+data.role+".";
+  }
+
+  if(data.type==="devices"){
+   document.getElementById("devices").textContent=
+    "Connected devices: "+data.count;
+  }
+
+  if(data.type==="command"){
+   document.getElementById("activity").textContent=
+    "Received command: "+data.action+
+    (data.position?" at "+data.position+" seconds":"");
+  }
+
+  if(data.type==="error"){
+   document.getElementById("activity").textContent=data.message;
+  }
+ };
+
+ socket.onerror=()=>{
+  document.getElementById("connection").textContent=
+   "Connection error. Check server deployment.";
+ };
+
+ socket.onclose=()=>{
+  document.getElementById("connection").textContent="Disconnected.";
+ };
+}
+
+function createRoom(){
+ openRoom(randomCode(),"main");
+}
+
+function joinRoom(){
+ const code=document.getElementById("roomInput").value.trim().toUpperCase();
+ if(!/^[A-Z0-9]{6}$/.test(code)){
+  document.getElementById("homeStatus").textContent=
+   "Enter a valid six-character room code.";
+  return;
+ }
+ openRoom(code,"guest");
+}
+
+function sendCommand(action){
+ if(!socket||socket.readyState!==WebSocket.OPEN){
+  document.getElementById("activity").textContent="Not connected.";
+  return;
+ }
+ socket.send(JSON.stringify({action,position:0}));
+}
+
+async function copyCode(){
+ try{
+  await navigator.clipboard.writeText(currentCode);
+  document.getElementById("activity").textContent="Room code copied!";
+ }catch{
+  document.getElementById("activity").textContent=
+   "Please copy the code manually.";
+ }
+}
+
+function leaveRoom(){
+ if(socket)socket.close();
+ socket=null;
+ currentCode=null;
+ currentRole=null;
+ document.getElementById("room").classList.add("hidden");
+ document.getElementById("home").classList.remove("hidden");
+ document.getElementById("homeStatus").textContent="Ready to connect.";
+}
+</script>
+</body>
+</html>
